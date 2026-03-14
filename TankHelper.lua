@@ -1,35 +1,13 @@
---         --------------------------------
---        |  Configuration                 |
---         --------------------------------
-
--- font
-local font_size = 14
-
---         --------------------------------
---        |  Don't edit below              |
---         --------------------------------
-
-local backdrop = {
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-	tile = false,
-	tileSize = 8,
-	edgeSize = 8,
-	insets = { left = 2, right = 2, top = 2, bottom = 2 }
-}
-
-local ArmorMiti = 0
+local fontSize = 14
+local armorMiti = false
 
 -- Frame
 local TankHelper = CreateFrame("Frame", "TankHelperFrame", UIParent)
 TankHelper:SetWidth(160)
 TankHelper:SetHeight(50)
-TankHelper:SetMovable(1)
--- TankHelper:EnableMouse(1)
+TankHelper:SetMovable(true)
 TankHelper:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 TankHelper:SetFrameStrata("BACKGROUND")
--- TankHelper:SetBackdrop(backdrop)
--- TankHelper:SetBackdropColor(0, 0, 0, 0)
 
 -- Events
 TankHelper:RegisterEvent("ADDON_LOADED")
@@ -43,14 +21,12 @@ TankHelper:RegisterEvent("PLAYER_TARGET_CHANGED")
 TankHelper:RegisterEvent("PLAYER_LOGIN")
 
 -- Text
-local mobstats = TankHelper:CreateFontString()
-mobstats:SetFontObject(GameFontNormal)
+local mobstats = TankHelper:CreateFontString("$parentText", "OVERLAY", "GameFontHighlight")
 mobstats:SetPoint("Topleft", TankHelper, "Topleft", 2, -3)
 mobstats:SetJustifyH("LEFT")
 mobstats:SetJustifyV("TOP")
-
-local font, size, flags = GameFontNormal:GetFont()
-mobstats:SetFont(font, font_size, "OUTLINE")
+local font, size, flags = mobstats:GetFont()
+mobstats:SetFont(font, fontSize, "OUTLINE")
 
 -- Chat command
 local function TankHelperFrameOptions(cmd)
@@ -62,13 +38,13 @@ local function TankHelperFrameOptions(cmd)
 	if cmd == "hide" then
 		TankHelper:Hide()
 		DEFAULT_CHAT_FRAME:AddMessage("TankHelper hidden. Type /tankhelper show to enable")
-		TankHelper_show = 0
+		TankHelper_show = false
 		return
 	end
 	if cmd == "show" then
 		TankHelper:Show()
 		DEFAULT_CHAT_FRAME:AddMessage("TankHelper shown. Type /tankhelper hide to disable")
-		TankHelper_show = 1
+		TankHelper_show = true
 		return
 	end
 	if cmd == "reset" then
@@ -77,18 +53,18 @@ local function TankHelperFrameOptions(cmd)
 		TankHelper:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 		TankHelper:SetScale(1)
 		TankHelper:SetAlpha(1)
-		TankHelper_show = 1
+		TankHelper_show = true
 		TankHelper_scale = 1
 		TankHelper_alpha = 1
-		ArmorMiti = 0
+		armorMiti = false
 		DEFAULT_CHAT_FRAME:AddMessage("TankHelper options reset")
 		return
 	end
-	local THargumentsplit = string.find(cmd, "%s")
-	if THargumentsplit then
-		DEFAULT_CHAT_FRAME:AddMessage(THargumentsplit)
-		local arg1 = string.sub(cmd, 1 , THargumentsplit - 1)
-		local arg2 = string.sub(cmd, THargumentsplit + 1)
+	local argumentsplit = string.find(cmd, "%s")
+	if argumentsplit then
+		DEFAULT_CHAT_FRAME:AddMessage(argumentsplit)
+		local arg1 = string.sub(cmd, 1 , argumentsplit - 1)
+		local arg2 = string.sub(cmd, argumentsplit + 1)
 		local arg2num = tonumber(arg2)
 		if not arg2num then
 			DEFAULT_CHAT_FRAME:AddMessage("TankHelper: Inappropriate command syntax")
@@ -125,62 +101,72 @@ local function mitigated(dmg)
 	return dmg - (dmg * tmpvalue)
 end
 
-local function OnEvent()
-	if event == "PLAYER_LOGIN"  then
-		if TankHelper_show == nil then -- if first time loading
-			TankHelper_show = 1
-			TankHelper_scale = 1
-			TankHelper_alpha = 1
-		end
-		TankHelper:ClearAllPoints()
-		TankHelper:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', unpack(TankHelper_position or {TankHelper:GetCenter()}))
-		TankHelper:SetScale(TankHelper_scale) -- load saved settings. It seems position saves on its own. (nope)
-		TankHelper:SetAlpha(TankHelper_alpha)
-		if TankHelper_show == 0 then
-			TankHelper:Hide()
-		end
-		return
-	end
+local function UpdateText()
 	if UnitExists("target") and not UnitIsPlayer("target") then
 		--Swing damage
 		local lowDmg, hiDmg, offlowDmg, offhiDmg, posBuff, negBuff, percentmod = UnitDamage("target")
-		if ArmorMiti == 1 then
+		if armorMiti then
 			lowDmg = floor(mitigated(lowDmg))
 			hiDmg = ceil(mitigated(hiDmg))
 		end
-		local swingstring = "|cffFFFFFFSwing:"..floor(lowDmg).."-"..ceil(hiDmg)
+		local swingstring = "Swing:"..floor(lowDmg).."-"..ceil(hiDmg)
 		if offlowDmg > 1 then -- means the mob has an offhand weapon
-			swingstring = swingstring.." |cffFF0000DW!"
+			swingstring = swingstring.." |cffFF0000DW!|r"
 		end
 		
 		--Attack power
 		local base, buff, debuff = UnitAttackPower("target")
 		local currentap = base + buff + debuff
-		local apstring = "|cffFFFFFFAP: "..currentap.."/"..base
+		local apstring = "AP: "..currentap.."/"..base
 		local apdiff = base - currentap
 		if UnitLevel("player") == 60 and apdiff <= 110 then -- warns when mob does not have demo shout or demo roar
-			apstring = apstring.." |cffFF0000DEMO!"
+			apstring = apstring.." |cffFF0000DEMO!|r"
 		end
 		
 		--Attack Speed
 		local mainSpeed = UnitAttackSpeed("target")
-		local speedstring = "|cffFFFFFFAS: "..string.format("%.2f", mainSpeed)
+		local speedstring = "AS: "..string.format("%.2f", mainSpeed)
 		
 		--Estimated DPS
 		local dpscalc = 0
 		if mainSpeed and mainSpeed > 0 then
 			dpscalc = floor(lowDmg*0.5/mainSpeed + hiDmg*0.5/mainSpeed)
 		end
-		if ArmorMiti == 1 then
-			dpscalc = "|cff74B72E"..dpscalc -- Green color if armor mitigation is toggled on, just for clarity
+		if armorMiti then
+			dpscalc = "|cff74B72E"..dpscalc.."|r" -- Green color if armor mitigation is toggled on, just for clarity
 		end
 		
+		-- Armor
+		local armorstring = "Armor: "..UnitArmor("target")
+
 		--Print combined text
-		mobstats:SetText(swingstring.."\n"..apstring.."\n"..speedstring.." | DPS: "..dpscalc)
-		TankHelper:EnableMouse(1)
+		mobstats:SetText(swingstring.."\n"..apstring.."\n"..speedstring.." | DPS: "..dpscalc.."\n"..armorstring)
+		TankHelper:EnableMouse(true)
 	else
-		mobstats:SetText(" ") --if not targeting an enemy mob, print nothing.
-		TankHelper:EnableMouse(nil)
+		mobstats:SetText("") --if not targeting an enemy mob, print nothing.
+		TankHelper:EnableMouse(false)
+	end
+end
+
+local function OnEvent()
+	if event == "PLAYER_LOGIN"  then
+		if TankHelper_show == nil then -- if first time loading
+			TankHelper_show = true
+			TankHelper_scale = 1
+			TankHelper_alpha = 1
+		end
+		TankHelper:ClearAllPoints()
+		TankHelper:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', unpack(TankHelper_position or {TankHelper:GetCenter()}))
+		TankHelper:SetScale(TankHelper_scale)
+		TankHelper:SetAlpha(TankHelper_alpha)
+		if not TankHelper_show then
+			TankHelper:Hide()
+		end
+		return
+	end
+	if event == "PLAYER_TARGET_CHANGED" or arg1 == "target" then
+		UpdateText()
+		return
 	end
 end
 
@@ -189,14 +175,14 @@ local function OnMouseDown()
 		if arg1 == "LeftButton" then
 			TankHelper:StartMoving()
 		elseif arg1 == "RightButton" then
-			if ArmorMiti == 0 then
+			if not armorMiti then
 				DEFAULT_CHAT_FRAME:AddMessage("TankHelper: Armor mitigation calculation |cffFF0000ON")
-				ArmorMiti = 1
+				armorMiti = true
 			else
 				DEFAULT_CHAT_FRAME:AddMessage("TankHelper: Armor mitigation calculation |cffFF0000OFF")
-				ArmorMiti = 0
+				armorMiti = false
 			end
-			OnEvent()
+			UpdateText()
 		end
 	end
 end
